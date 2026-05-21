@@ -178,6 +178,13 @@ open_and_read_4dot2(char *filename, f77int *iret)
                     nentry++;
                 }
             }
+            /*
+            **  Sort the entries within the internal memory structure to ensure
+            **  search_for_4dot2_entry() works correctly even if the file was unsorted.
+            */
+            if (nentry > 0) {
+                qsort(pe0, nentry, sizeof(struct TableEntry), compar);
+            }
             *iret = (f77int) 0;
             return;
         } catch (const std::exception& e) {
@@ -229,6 +236,14 @@ open_and_read_4dot2(char *filename, f77int *iret)
 **  Close the file.
 */
     fclose (pfn);
+
+    /*
+    **  Sort the entries within the internal memory structure to ensure
+    **  search_for_4dot2_entry() works correctly even if the file was unsorted.
+    */
+    if (nentry > 0) {
+        qsort(pe0, nentry, sizeof(struct TableEntry), compar);
+    }
 
     *iret = (f77int) 0;
 }

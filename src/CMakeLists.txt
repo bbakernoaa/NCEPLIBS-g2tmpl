@@ -59,7 +59,7 @@ target_link_libraries(sort_params_grib2_tbl ${lib_name})
 
 # Install the library.
 install(DIRECTORY ${module_dir} DESTINATION ${CMAKE_INSTALL_PREFIX})
-install(FILES params_grib2_tbl_new DESTINATION ${CMAKE_INSTALL_PREFIX}/share)
+install(FILES params_grib2_tbl_new params_grib2_tbl_new.yaml DESTINATION ${CMAKE_INSTALL_PREFIX}/share)
 install(
   TARGETS ${lib_name}
   EXPORT ${PROJECT_NAME}Exports
