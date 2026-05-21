@@ -1,5 +1,8 @@
 build/
 install/
+test_output/
+*.log
+*.new
 
 *.[ao]
 *.mod
