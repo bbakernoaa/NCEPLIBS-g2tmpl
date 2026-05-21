@@ -1,7 +1,41 @@
+# Build directories
 build/
 install/
+bin/
+lib/
 
+# Testing artifacts
+Testing/
+test_output/
+*.log
+*.new
+*.trs
+*.test
+
+# Object files and libraries
 *.[ao]
-*.mod
+*.obj
 *.so
+*.dylib
+*.dll
+*.la
+*.lo
+
+# Fortran module files
+*.mod
+*.smod
+
+# Executables
+*.exe
+*.out
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*~
 *.swp
+
+# Python artifacts (for scripts)
+__pycache__/
+*.pyc

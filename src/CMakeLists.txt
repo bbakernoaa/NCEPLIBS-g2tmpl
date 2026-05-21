@@ -27,16 +27,16 @@ elseif(CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang|AppleClang)$")
   set(CMAKE_Fortran_FLAGS_DEBUG "-ggdb -Wall")
 endif()
 
-# These are the library source files in Fortran and C.
+# These are the library source files in Fortran, C, and C++.
 set(fortran_src g2sec4_temp11.F90 g2sec4_temp1.F90
                 grib2_all_tables_module.F90 g2sec4_temp12.F90 )
-set(c_src process_4dot2.c)
+set(cxx_src process_4dot2.cpp)
 
 set(lib_name ${PROJECT_NAME})
 set(module_dir ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 # Add the library to the build.
-add_library(${lib_name} ${fortran_src} ${c_src})
+add_library(${lib_name} ${fortran_src} ${cxx_src})
 if(BUILD_SHARED_LIBS)
   set_property(TARGET ${lib_name} PROPERTY POSITION_INDEPENDENT_CODE 1)
   set_target_properties(${lib_name} PROPERTIES SOVERSION 0)  
@@ -59,7 +59,7 @@ target_link_libraries(sort_params_grib2_tbl ${lib_name})
 
 # Install the library.
 install(DIRECTORY ${module_dir} DESTINATION ${CMAKE_INSTALL_PREFIX})
-install(FILES params_grib2_tbl_new DESTINATION ${CMAKE_INSTALL_PREFIX}/share)
+install(FILES params_grib2_tbl_new params_grib2_tbl_new.yaml DESTINATION ${CMAKE_INSTALL_PREFIX}/share)
 install(
   TARGETS ${lib_name}
   EXPORT ${PROJECT_NAME}Exports

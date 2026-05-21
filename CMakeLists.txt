@@ -9,7 +9,7 @@ file(STRINGS "VERSION" pVersion)
 project(
   g2tmpl
   VERSION ${pVersion}
-  LANGUAGES C Fortran)
+  LANGUAGES C Fortran CXX)
 
 include(GNUInstallDirs)
 

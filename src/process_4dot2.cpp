@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <fstream>
+#include "fkyaml.hpp"
 
 /** Define the maximum length of a mnemonic in GRIB2 Code Table
  * 4.2. */
@@ -65,24 +67,30 @@ struct TableEntry *pe0 = NULL;
 size_t nentry = 0;
 
 /* Prototypes. */
+extern "C" {
 void open_and_read_4dot2(char *, f77int *);
 void sort_and_write_4dot2(char *, f77int *);
-/* void search_for_4dot2_entry(char *, f77int *, f77int *, f77int *, f77int *, f77int *); */
-int compar(const struct TableEntry *, const struct TableEntry *);
+void search_for_4dot2_entry(char nemo[MXG2MNEM], f77int *locflg,
+                       f77int *disc, f77int *catg, f77int *parm,
+                       f77int *iret);
 void close_4dot2(f77int *);
+}
+int compar(const void *, const void *);
 
 /**
  * Define the internal comparison function for use with qsort and
  * bsearch.
  *
- * @param pte1 TableEntry1
- * @param pte2 TableEntry2
+ * @param p1 TableEntry1
+ * @param p2 TableEntry2
  *
  * @return 0 if they are the same.
  */
 int
-compar(const struct TableEntry *pte1, const struct TableEntry *pte2)
+compar(const void *p1, const void *p2)
 {
+    const struct TableEntry *pte1 = (const struct TableEntry *) p1;
+    const struct TableEntry *pte2 = (const struct TableEntry *) p2;
     return strcmp(pte1->mnemonic, pte2->mnemonic);
 }
 
@@ -109,7 +117,7 @@ compar(const struct TableEntry *pte1, const struct TableEntry *pte2)
  * - -2 table file could not be opened
  * - -3 memory allocation error
  */
-void
+extern "C" void
 open_and_read_4dot2(char *filename, f77int *iret)
 {
 
@@ -119,7 +127,10 @@ open_and_read_4dot2(char *filename, f77int *iret)
 
     size_t i;
 
-    FILE *pfn;
+    /* Reset global variables in case of multiple calls */
+    if (pe0) free(pe0);
+    pe0 = NULL;
+    nentry = 0;
 
 /*
 **  Copy the input filename into a local variable and check it for validity.
@@ -137,8 +148,62 @@ open_and_read_4dot2(char *filename, f77int *iret)
     lfn[i] = '\0';
 
 /*
+**  Check if the file is a YAML file.
+*/
+    if ((strstr(lfn, ".yaml") != NULL) || (strstr(lfn, ".yml") != NULL)) {
+        try {
+            std::ifstream ifs(lfn);
+            if (!ifs.is_open()) {
+                *iret = (f77int) -2;
+                printf("Can't open input file %s\n", lfn);
+                return;
+            }
+            fkyaml::node root = fkyaml::node::deserialize(ifs);
+
+            if (root.is_sequence()) {
+                for (auto& item : root.get_value_ref<fkyaml::node::sequence_type&>()) {
+                    if ((nentry % NUMALLOC) == 0) {
+                        pra = (struct TableEntry *) realloc(pe0, ((nentry + NUMALLOC) * sizeof(struct TableEntry)));
+                        if (pra == NULL) {
+                            *iret = (f77int) -3;
+                            return;
+                        }
+                        pe0 = pra;
+                        memset(&pe0[nentry], 0, NUMALLOC * sizeof(struct TableEntry));
+                    }
+                    pe0[nentry].discipline = item["discipline"].template get_value<int>();
+                    pe0[nentry].category = item["category"].template get_value<int>();
+                    pe0[nentry].parameter = item["parameter"].template get_value<int>();
+                    std::string mnem = item["mnemonic"].template get_value<std::string>();
+                    int loc = item["local"].template get_value<int>();
+                    strncpy(pe0[nentry].mnemonic, mnem.c_str(), MXG2MNEM);
+                    pe0[nentry].mnemonic[MXG2MNEM] = '\0';
+                    strncat(pe0[nentry].mnemonic, &cub, 1);
+                    cflag = (loc == 1) ? '1' : '0';
+                    strncat(pe0[nentry].mnemonic, &cflag, 1);
+                    nentry++;
+                }
+            }
+            /*
+            **  Sort the entries within the internal memory structure to ensure
+            **  search_for_4dot2_entry() works correctly even if the file was unsorted.
+            */
+            if (nentry > 0) {
+                qsort(pe0, nentry, sizeof(struct TableEntry), compar);
+            }
+            *iret = (f77int) 0;
+            return;
+        } catch (const std::exception& e) {
+            printf("Error parsing YAML file %s: %s\n", lfn, e.what());
+            *iret = (f77int) -2;
+            return;
+        }
+    }
+
+/*
 **  Open the file.
 */
+    FILE *pfn;
     if ((pfn = fopen(lfn, "r")) == NULL) {
         *iret = (f77int) -2;
         printf("Can't open input file %s\n",lfn);
@@ -155,12 +220,14 @@ open_and_read_4dot2(char *filename, f77int *iret)
 /*
 **              Allocate additional memory.
 */
-                pra = realloc(pe0, (NUMALLOC * sizeof(struct TableEntry)));
+                pra = (struct TableEntry *) realloc(pe0, ((nentry + NUMALLOC) * sizeof(struct TableEntry)));
                 if (pra == NULL) {
                     *iret = (f77int) -3;
+                    fclose(pfn);
                     return;
                 }
                 pe0 = pra;
+                memset(&pe0[nentry], 0, NUMALLOC * sizeof(struct TableEntry));
             }
             sscanf(str, "%d%d%d%*3c%c%*c%s",
                    &pe0[nentry].discipline, &pe0[nentry].category,
@@ -176,6 +243,14 @@ open_and_read_4dot2(char *filename, f77int *iret)
 **  Close the file.
 */
     fclose (pfn);
+
+    /*
+    **  Sort the entries within the internal memory structure to ensure
+    **  search_for_4dot2_entry() works correctly even if the file was unsorted.
+    */
+    if (nentry > 0) {
+        qsort(pe0, nentry, sizeof(struct TableEntry), compar);
+    }
 
     *iret = (f77int) 0;
 }
@@ -195,7 +270,7 @@ open_and_read_4dot2(char *filename, f77int *iret)
  * - -1 filename was more than 120 characters
  * - -2 filename could not be opened
  */
-void
+extern "C" void
 sort_and_write_4dot2(char *filename, f77int *iret)
 {
 #define MXFNLEN 120
@@ -233,8 +308,7 @@ sort_and_write_4dot2(char *filename, f77int *iret)
 /*
 **  Sort the entries within the internal memory structure.
 */
-    qsort(pe0, nentry, sizeof(struct TableEntry),
-          (int (*) (const void *, const void *)) compar);
+    qsort(pe0, nentry, sizeof(struct TableEntry), compar);
 
 /*
 **  Write the sorted entries to the output file.
@@ -280,7 +354,7 @@ sort_and_write_4dot2(char *filename, f77int *iret)
  * - 0 normal return
  * - -1 nemo not found within table for specified locflg version
  */
-void
+extern "C" void
 search_for_4dot2_entry(char nemo[MXG2MNEM], f77int *locflg,
                        f77int *disc, f77int *catg, f77int *parm,
                        f77int *iret)
@@ -317,8 +391,7 @@ search_for_4dot2_entry(char nemo[MXG2MNEM], f77int *locflg,
 /*
 **  Search for the mnemonic in the Code Table and return appropriate output values.
 */
-    pbs = bsearch(&key, pe0, nentry, sizeof(struct TableEntry),
-                  (int (*) (const void *, const void *)) compar);
+    pbs = (struct TableEntry *) bsearch(&key, pe0, nentry, sizeof(struct TableEntry), compar);
     if (pbs == NULL) {
         *iret = (f77int) -1;
     }
@@ -338,9 +411,11 @@ search_for_4dot2_entry(char nemo[MXG2MNEM], f77int *locflg,
  *
  * @param iret Return code: 0 = normal return.
  */
-void
+extern "C" void
 close_4dot2(f77int *iret)
 {
-    free (pe0);
+    if (pe0) free (pe0);
+    pe0 = NULL;
+    nentry = 0;
     *iret = (f77int) 0;
 }

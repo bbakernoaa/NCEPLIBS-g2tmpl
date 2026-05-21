@@ -70,6 +70,31 @@ program test_params_grib2_tbl_new
           ' ; parameter = ',iparm, ' in grib2 table 4.2 '
   end do
 
+  call close_4dot2(ierr)
+
+  print *, 'Testing YAML version of table.'
+  fl_nametbl = 'params_grib2_tbl_new.yaml'
+  call open_and_read_4dot2(fl_nametbl, ierr)
+  if ( ierr .ne. 0 ) then
+     print*, 'Couldnt open YAML table file - return code was ',ierr
+     stop 2
+  endif
+
+  do i = 1,15
+     idisc = 0
+     icatg = 0
+     iparm = 0
+     call search_for_4dot2_entry(pname(i),locflg, idisc, icatg, iparm, ierr)
+     if (ierr .ne. 0) then
+        print*, 'Could not find Mnemonic ', trim(pname(i)),' in grib2 YAML table 4.2 '
+        stop 3
+     end if
+     write(6,'(A,A,3(A,I4),A)') ' YAML: Mnemonic = ',trim(pname(i)), &
+          ' is discipline = ',idisc,           &
+          ' ; category = ',icatg,             &
+          ' ; parameter = ',iparm, ' in grib2 table 4.2 '
+  end do
+
   print *, 'OK!'
   print *, 'SUCCESS!'
 
