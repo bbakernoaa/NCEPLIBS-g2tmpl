@@ -127,6 +127,11 @@ open_and_read_4dot2(char *filename, f77int *iret)
 
     size_t i;
 
+    /* Reset global variables in case of multiple calls */
+    if (pe0) free(pe0);
+    pe0 = NULL;
+    nentry = 0;
+
 /*
 **  Copy the input filename into a local variable and check it for validity.
 **  This is especially important in case the filename was passed in as a
@@ -164,6 +169,7 @@ open_and_read_4dot2(char *filename, f77int *iret)
                             return;
                         }
                         pe0 = pra;
+                        memset(&pe0[nentry], 0, NUMALLOC * sizeof(struct TableEntry));
                     }
                     pe0[nentry].discipline = item["discipline"].template get_value<int>();
                     pe0[nentry].category = item["category"].template get_value<int>();
@@ -221,6 +227,7 @@ open_and_read_4dot2(char *filename, f77int *iret)
                     return;
                 }
                 pe0 = pra;
+                memset(&pe0[nentry], 0, NUMALLOC * sizeof(struct TableEntry));
             }
             sscanf(str, "%d%d%d%*3c%c%*c%s",
                    &pe0[nentry].discipline, &pe0[nentry].category,
@@ -407,6 +414,8 @@ search_for_4dot2_entry(char nemo[MXG2MNEM], f77int *locflg,
 extern "C" void
 close_4dot2(f77int *iret)
 {
-    free (pe0);
+    if (pe0) free (pe0);
+    pe0 = NULL;
+    nentry = 0;
     *iret = (f77int) 0;
 }
