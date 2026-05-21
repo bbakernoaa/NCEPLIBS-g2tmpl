@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <fstream>
 #include "fkyaml.hpp"
 
 /** Define the maximum length of a mnemonic in GRIB2 Code Table
@@ -146,14 +147,13 @@ open_and_read_4dot2(char *filename, f77int *iret)
 */
     if ((strstr(lfn, ".yaml") != NULL) || (strstr(lfn, ".yml") != NULL)) {
         try {
-            FILE *pfn = fopen(lfn, "r");
-            if (pfn == NULL) {
+            std::ifstream ifs(lfn);
+            if (!ifs.is_open()) {
                 *iret = (f77int) -2;
                 printf("Can't open input file %s\n", lfn);
                 return;
             }
-            fkyaml::node root = fkyaml::node::deserialize(pfn);
-            fclose(pfn);
+            fkyaml::node root = fkyaml::node::deserialize(ifs);
 
             if (root.is_sequence()) {
                 for (auto& item : root.get_value_ref<fkyaml::node::sequence_type&>()) {
